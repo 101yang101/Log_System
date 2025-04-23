@@ -66,11 +66,11 @@ log-system/
 
 
 ## 技术栈
-- **消息队列: ActiveMQ
-- **编程语言: Java
-- **构建工具: Maven
-- **前端: HTML + JavaScript（Chart.js 用于绘图）
-- **其他依赖:Jackson (JSON 序列化/反序列化)
+- **消息队列**: ActiveMQ
+- **编程语言**: Java
+- **构建工具**: Maven
+- **前端**: HTML + JavaScript（Chart.js 用于绘图）
+- **其他依赖**:Jackson (JSON 序列化/反序列化)
 
 ## 安装指南
 
