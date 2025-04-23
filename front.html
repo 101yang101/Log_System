@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>设备监控</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 20px;
+            background-color: #f9f9f9;
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+            color: #4CAF50;
+            margin-bottom: 30px;
+            font-size: 36px; /* 增大字体大小 */
+            line-height: 1.2; /* 调整行高 */
+            font-weight: bold; /* 确保字体加粗 */
+        }
+        .device-container {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            background-color: #fff;
+            transition: transform 0.3s ease;
+        }
+        .device-container:hover {
+            transform: translateY(-5px);
+        }
+        .device-info {
+            width: 48%; /* 左半部分的宽度 */
+            display: flex; /* 使用弹性布局 */
+            flex-direction: column; /* 内容垂直排列 */
+            justify-content: center; /* 垂直居中 */
+            margin-left: 80px; /* 调整左边距 */
+            text-align: left; /* 文本左对齐 */
+            font-size: 18px; /* 增大字体大小 */
+        }
+        .device-info h2 {
+            margin-top: 0;
+            color: #4CAF50;
+            font-size: 28px; /* 单独设置标题的字体大小 */
+        }
+        .device-info p {
+            margin: 8px 0;
+            line-height: 1.6;
+        }
+        .chart-container {
+            width: 70%;
+        }
+        canvas {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<h1>设备监控</h1>
+
+<div id="devices-container"></div>
+
+<script>
+    const deviceData = {}; // 存储每个设备的历史数据
+    const charts = {};     // 存储每个设备的 Chart 实例
+
+    async function fetchMonitorData() {
+        try {
+            const response = await fetch('http://localhost:8080/api/monitor');
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const devices = await response.json();
+            updateDevices(devices);
+        } catch (error) {
+            console.error('获取设备监控数据失败:', error);
+        }
+    }
+
+    function updateDevices(devices) {
+        devices.forEach(device => {
+            const deviceId = device.device_id;
+
+            if (!deviceData[deviceId]) {
+                deviceData[deviceId] = {
+                    warnHistory: [],
+                    errorHistory: [],
+                    timestamps: []
+                };
+            }
+
+            const history = deviceData[deviceId];
+            history.warnHistory.push(device.warn_percentage);
+            history.errorHistory.push(device.error_percentage);
+            // 提取时间戳的时分秒部分并存储
+            const fullTimestamp = device.analysis_timestamp; // 完整时间戳
+            const timeOnly = fullTimestamp.split(' ')[1]; // 提取时分秒
+            history.timestamps.push(timeOnly); // 存储时分秒
+
+            if (history.warnHistory.length > 50) {
+                history.warnHistory.shift();
+                history.errorHistory.shift();
+                history.timestamps.shift();
+            }
+
+            let deviceContainer = document.getElementById(`device-${deviceId}`);
+            if (!deviceContainer) {
+                deviceContainer = createDeviceContainer(deviceId);
+            }
+
+            const infoDiv = deviceContainer.querySelector('.device-info');
+            infoDiv.innerHTML = `
+                <h2>设备 ID: ${deviceId}</h2>
+                <p><strong>WARN 占比:</strong> ${device.warn_percentage}%</p>
+                <p><strong>ERROR 占比:</strong> ${device.error_percentage}%</p>
+                <p><strong>最近一次 ERROR 事件:</strong> ${device.last_error_timestamp || '无'}</p>
+                <p><strong>严重告警状态:</strong> ${device.alert_status ? device.alert_status : '否'}</p>
+                ${device.alert_status && device.alert_status !== '无' ?
+                    `<p><strong>最近一次严重告警时间:</strong> ${device.alert_timestamp || '无'}</p>` +
+                    `<p><strong>严重告警次数:</strong> ${device.alert_count}</p>`
+                  : ''}
+            `;
+
+            const ctx = deviceContainer.querySelector('.chart-container canvas').getContext('2d');
+
+            if (!charts[deviceId]) {
+                charts[deviceId] = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: history.timestamps,
+                        datasets: [
+                            {
+                                label: 'WARN 占比',
+                                data: history.warnHistory,
+                                borderColor: '#FFA500',
+                                backgroundColor: 'rgba(255, 165, 0, 0.2)',
+                                fill: true,
+                                tension: 0.4
+                            },
+                            {
+                                label: 'ERROR 占比',
+                                data: history.errorHistory,
+                                borderColor: '#FF5733',
+                                backgroundColor: 'rgba(255, 87, 51, 0.2)',
+                                fill: true,
+                                tension: 0.4
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        animation: false,
+                        plugins: {
+                            legend: {
+                                position: 'top'
+                            },
+                            title: {
+                                display: true,
+                                text: `设备 ${deviceId} 的 WARN 和 ERROR 占比变化`,
+                                font: {
+                                    size: 16
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                ticks: {
+                                    autoSkip: true,
+                                    maxRotation: 0,
+                                    minRotation: 0
+                                }
+                            },
+                            y: {
+                                min: 0,
+                                max: 100,
+                                ticks: {
+                                    callback: value => value + '%'
+                                }
+                            }
+                        }
+                    }
+                });
+            } else {
+                const chart = charts[deviceId];
+                chart.data.labels = history.timestamps;
+                chart.data.datasets[0].data = history.warnHistory;
+                chart.data.datasets[1].data = history.errorHistory;
+                chart.update();
+            }
+        });
+    }
+
+    function createDeviceContainer(deviceId) {
+        const container = document.createElement('div');
+        container.id = `device-${deviceId}`;
+        container.className = 'device-container';
+
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'device-info';
+        container.appendChild(infoDiv);
+
+        const chartContainer = document.createElement('div');
+        chartContainer.className = 'chart-container';
+        chartContainer.innerHTML = `<canvas></canvas>`;
+        container.appendChild(chartContainer);
+
+        document.getElementById('devices-container').appendChild(container);
+        return container;
+    }
+
+    window.onload = () => {
+        fetchMonitorData();
+        setInterval(fetchMonitorData, 5000); // 每 5 秒轮询
+    };
+</script>
+</body>
+</html>
