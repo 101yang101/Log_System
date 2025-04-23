@@ -63,7 +63,7 @@ log-system/
 
 
 ## 效果展示
-
+![展示](DISPLAY.png)
 
 ## 技术栈
 - **消息队列**: ActiveMQ
