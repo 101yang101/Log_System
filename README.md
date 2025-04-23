@@ -117,3 +117,6 @@ log-system/
 
 ## 联系方式
 - 邮箱：yang189256@163.com
+
+## 其他
+ActiveMQ、log-producer、log-analyzer、log-monitor、front.html 可以分布在不同的计算机上运行，只需要正确配置 ActiveMQ 的服务器地址，以及在 front.html 中配置好 RESTful 的地址即可。
